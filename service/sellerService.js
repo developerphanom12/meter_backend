@@ -2,7 +2,11 @@ const db = require("../Database/connection");
 const bcrypt = require("bcrypt");
 const { func } = require("joi");
 const jwt = require("jsonwebtoken");
+const dotenv = require('dotenv')
 
+dotenv.config();
+const JWT_SECRET = process.env.JWT_SECRET || "secret"; // Ensure this is set in your environment variables
+console.log("lfgjkfdjgkdfg",JWT_SECRET)
 
 function sellergister(
   name,
@@ -54,6 +58,20 @@ function checkname(name) {
   return new Promise((resolve, reject) => {
     const query = "SELECT * FROM user WHERE name = ?";
     db.query(query, [name], (err, results) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(results.length > 0 ? true : false);
+      }
+    });
+  });
+}
+
+
+function checkphone(mobile_number) {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT * FROM user WHERE mobile_number = ?";
+    db.query(query, [mobile_number], (err, results) => {
       if (err) {
         reject(err);
       } else {
@@ -118,9 +136,85 @@ function loginseller(email, password, callback) {
 }
 
 
+
+function sellergister(
+  mobile_number,
+  otp
+) {
+  return new Promise((resolve, reject) => {
+    const insertSql = `
+    INSERT INTO user_otp(mobile_number, otp) 
+    VALUES (?, ?)
+    `;
+
+    const values = [
+      mobile_number,
+      otp
+    ];
+
+    db.query(insertSql, values, (error, result) => {
+      if (error) {
+        console.error("Error While inserting data:", error);
+        reject(error);
+      } else {
+        const sellerId = result.insertId;
+
+        if (sellerId > 0) {
+          const successMessage = "otp send successfully";
+          resolve(successMessage);
+        } else {
+          const errorMessage = "Failed to send otp";
+          reject(errorMessage);
+        }
+      }
+    });
+  });
+}
+
+
+
+function generateOTP() {
+  let digits = '0123456789';
+  let OTP = '';
+  for (let i = 0; i < 4; i++) {
+      OTP += digits[Math.floor(Math.random() * digits.length)];
+  }
+  return OTP;
+}
+
+function storeOTP(mobile_number, otp) {
+  return new Promise((resolve, reject) => {
+    const insertSql = `
+      INSERT INTO user_otp (mobile_number, otp)
+      VALUES (?, ?)
+    `;
+    const values = [mobile_number, otp];
+
+    db.query(insertSql, values, (error, result) => {
+      if (error) {
+        console.error("Error while inserting data:", error);
+        reject(error);
+      } else {
+        const successMessage = "OTP sent successfully";
+        resolve(successMessage);
+      }
+    });
+  });
+}
+
+
+// Function to generate a JWT token
+function generateToken(mobile_number) {
+  const token = jwt.sign({ mobile_number }, JWT_SECRET, { expiresIn: '1h' });
+  return token;
+}
 module.exports = {
   sellergister,
   checkname,
   loginseller,
-  checkemail
+  checkemail,
+  generateOTP,
+  storeOTP,
+  checkphone,
+  generateToken
 };

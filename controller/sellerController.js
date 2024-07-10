@@ -102,9 +102,55 @@ const loginseller = async (req, res) => {
 };
 
 
+function generateOTP() {
+  let digits = '0123456789';
+  let OTP = '';
+  let length = digits.length;
+  for (let i = 0; i < 4; i++) {
+      OTP += digits[Math.floor(Math.random() * length)];
+  }
+  return OTP;
+}
+
+
+const sendOTP = async (req, res) => {
+  const { mobile_number } = req.body;
+
+  try {
+    const phoneExists = await sellerService.checkphone(mobile_number);
+
+    if (!phoneExists) {
+      return res.status(404).json({
+        status: 404,
+        error: "Phone number not found",
+        message: "The provided phone number does not exist in our records",
+      });
+    }
+
+    const otp = sellerService.generateOTP();
+
+    const result = await sellerService.storeOTP(mobile_number, otp);
+
+    const token = sellerService.generateToken(mobile_number);
+
+    res.status(200).json({
+      message: result,
+      status: 200,
+      token, // Return the token
+    });
+  } catch (error) {
+    console.error("Error sending OTP:", error);
+    res.status(500).json({
+      status: 500,
+      error: "Failed to send OTP",
+      message: error.message,
+    });
+  }
+};
 
 module.exports = {
   createseller,
   loginseller,
+  sendOTP
 
 };
