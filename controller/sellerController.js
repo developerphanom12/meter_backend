@@ -2,7 +2,6 @@ const sellerService = require("../service/sellerService");
 const bcrypt = require("bcrypt");
 let saltRounds = 10;
 
-
 const createseller = async (req, res) => {
   try {
     const {
@@ -12,7 +11,7 @@ const createseller = async (req, res) => {
       password,
       address,
       company_name,
-      gst_number
+      gst_number,
     } = req.body;
 
     const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -24,14 +23,12 @@ const createseller = async (req, res) => {
         .json({ status: 404, message: "Username already registered" });
     }
 
-    
     const emailcheck = await sellerService.checkemail(email);
     if (emailcheck) {
       return res
         .status(404)
         .json({ status: 404, message: "email already registered" });
     }
-
 
     const datacreate = await sellerService.sellergister(
       name,
@@ -64,9 +61,6 @@ const createseller = async (req, res) => {
     });
   }
 };
-
-
-
 
 const loginseller = async (req, res) => {
   const { email, password } = req.body;
@@ -101,18 +95,6 @@ const loginseller = async (req, res) => {
   }
 };
 
-
-function generateOTP() {
-  let digits = '0123456789';
-  let OTP = '';
-  let length = digits.length;
-  for (let i = 0; i < 4; i++) {
-      OTP += digits[Math.floor(Math.random() * length)];
-  }
-  return OTP;
-}
-
-
 const sendOTP = async (req, res) => {
   const { mobile_number } = req.body;
 
@@ -131,12 +113,14 @@ const sendOTP = async (req, res) => {
 
     const result = await sellerService.storeOTP(mobile_number, otp);
 
-    const token = sellerService.generateToken(mobile_number);
+    // const token = sellerService.generateToken(mobile_number);
 
-    res.status(200).json({
+    res.status(201).json({
       message: result,
-      status: 200,
-      token, // Return the token
+      status: 201,
+      data: {
+        otp: otp,
+      },
     });
   } catch (error) {
     console.error("Error sending OTP:", error);
@@ -148,9 +132,55 @@ const sendOTP = async (req, res) => {
   }
 };
 
+const verifyOTPHandler = async (req, res) => {
+  const { mobile_number, otp } = req.body;
+
+  try {
+    const result = await sellerService.verifyOTP(mobile_number, otp);
+
+    res.status(200).json({
+      status: 200,
+      message: result,
+    });
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    res.status(400).json({
+      status: 400,
+      error: "Failed to verify OTP",
+      message: error.message,
+    });
+  }
+};
+
+const changePasswordHandler = async (req, res) => {
+  const { mobile_number, password } = req.body;
+
+  try {
+    const result = await sellerService.changePassword({
+      mobile_number,
+      password,
+    });
+
+    res.status(201).json({
+      status: 201,
+      data: {
+        message: result,
+      },
+    });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    res.status(500).json({
+      status: 500,
+      error: "Failed to change password",
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   createseller,
   loginseller,
-  sendOTP
-
+  sendOTP,
+  verifyOTPHandler,
+  changePasswordHandler,
 };

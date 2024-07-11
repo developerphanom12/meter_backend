@@ -3,7 +3,7 @@ const bcrypt = require("bcrypt");
 const { func } = require("joi");
 const jwt = require("jsonwebtoken");
 const dotenv = require('dotenv')
-
+let saltRounds = 10;
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET || "secret"; // Ensure this is set in your environment variables
 console.log("lfgjkfdjgkdfg",JWT_SECRET)
@@ -174,39 +174,131 @@ function sellergister(
 
 
 function generateOTP() {
-  let digits = '0123456789';
-  let OTP = '';
-  for (let i = 0; i < 4; i++) {
-      OTP += digits[Math.floor(Math.random() * digits.length)];
-  }
+  let OTP = '123456';
   return OTP;
 }
 
 function storeOTP(mobile_number, otp) {
   return new Promise((resolve, reject) => {
+    const deleteSql = `
+      DELETE FROM user_otp WHERE mobile_number = ?
+    `;
     const insertSql = `
       INSERT INTO user_otp (mobile_number, otp)
       VALUES (?, ?)
     `;
-    const values = [mobile_number, otp];
+    db.beginTransaction((err) => {
+      if (err) {
+        console.error("Error starting transaction:", err);
+        return reject(err);
+      }
 
-    db.query(insertSql, values, (error, result) => {
+      db.query(deleteSql, [mobile_number], (error) => {
+        if (error) {
+          return db.rollback(() => {
+            console.error("Error deleting existing OTP:", error);
+            reject(error);
+          });
+        }
+
+        db.query(insertSql, [mobile_number, otp], (error, result) => {
+          if (error) {
+            return db.rollback(() => {
+              console.error("Error while inserting data:", error);
+              reject(error);
+            });
+          }
+
+          db.commit((err) => {
+            if (err) {
+              return db.rollback(() => {
+                console.error("Error committing transaction:", err);
+                reject(err);
+              });
+            }
+
+            const successMessage = "OTP sent successfully";
+            resolve(successMessage);
+          });
+        });
+      });
+    });
+  });
+}
+
+// // Function to generate a JWT token
+// function generateToken(mobile_number) {
+//   const token = jwt.sign({ mobile_number }, JWT_SECRET, { expiresIn: '1h' });
+//   return token;
+// }
+
+
+function verifyOTP(mobile_number, otp) {
+  return new Promise((resolve, reject) => {
+    const selectSql = `
+      SELECT * FROM user_otp WHERE mobile_number = ? AND otp = ?
+    `;
+    const updateSql = `
+      UPDATE user_otp SET is_verified = 1 WHERE mobile_number = ? AND otp = ?
+    `;
+    
+    db.query(selectSql, [mobile_number, otp], (error, results) => {
       if (error) {
-        console.error("Error while inserting data:", error);
+        console.error("Error while selecting data:", error);
         reject(error);
+      } else if (results.length === 0) {
+        reject(new Error("Invalid OTP"));
       } else {
-        const successMessage = "OTP sent successfully";
-        resolve(successMessage);
+        db.query(updateSql, [mobile_number, otp], (updateError, updateResult) => {
+          if (updateError) {
+            console.error("Error while updating data:", updateError);
+            reject(updateError);
+          } else {
+            resolve("OTP verified successfully and is_verified updated");
+          }
+        });
       }
     });
   });
 }
 
+// Verify OTP and Change Password Function
+async function changePassword({ mobile_number, password }) {
+  return new Promise((resolve, reject) => {
+    const selectSql = `
+      SELECT * FROM user_otp WHERE mobile_number = ? AND is_verified = 1
+    `;
+    const updateSql = `
+      UPDATE user SET password = ? WHERE mobile_number = ?
+    `;
+    
+    db.query(selectSql, mobile_number, async (error, results) => {
+      if (error) {
+        console.error("Error while selecting data:", error);
+        return reject(error);
+      }
+      
+      if (results.length === 0) {
+        return reject(new Error("OTP not verified"));
+      }
 
-// Function to generate a JWT token
-function generateToken(mobile_number) {
-  const token = jwt.sign({ mobile_number }, JWT_SECRET, { expiresIn: '1h' });
-  return token;
+      try {
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        db.query(updateSql, [hashedPassword, mobile_number], (updateError, updateResult) => {
+          if (updateError) {
+            console.error("Error while updating data:", updateError);
+            return reject(updateError);
+          }
+
+          resolve("Password changed successfully");
+        });
+      } catch (hashError) {
+        console.error("Error while hashing password:", hashError);
+        reject(hashError);
+      }
+    });
+  });
 }
 module.exports = {
   sellergister,
@@ -216,5 +308,6 @@ module.exports = {
   generateOTP,
   storeOTP,
   checkphone,
-  generateToken
+  verifyOTP,
+  changePassword
 };
