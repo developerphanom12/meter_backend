@@ -300,6 +300,107 @@ async function changePassword({ mobile_number, password }) {
     });
   });
 }
+
+
+
+function checkSubId(sub_id) {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT * FROM subscription WHERE id = ?";
+    db.query(query, [sub_id], (err, results) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(results.length > 0 ? results[0] : null);
+      }
+    });
+  });
+}
+function userSubscription(sub_id, userId) {
+  return new Promise((resolve, reject) => {
+    const updateSql = `
+      UPDATE user_subscription SET is_deleted = 1 WHERE user_id = ?
+    `;
+
+    const insertSql = `
+      INSERT INTO user_subscription (sub_id, user_id) 
+      VALUES (?, ?)
+    `;
+
+    db.query(updateSql, [userId], (updateError, updateResult) => {
+      if (updateError) {
+        console.error("Error while marking previous subscriptions as deleted:", updateError);
+        return reject(updateError);
+      }
+
+      const values = [sub_id, userId];
+      db.query(insertSql, values, (insertError, insertResult) => {
+        if (insertError) {
+          console.error("Error while inserting new subscription:", insertError);
+          return reject(insertError);
+        }
+
+        const subscriptionId = insertResult.insertId;
+
+        if (subscriptionId > 0) {
+          const selectSql = `
+            SELECT 
+              c.id AS subscription_id, 
+              c.sub_id, 
+              c.user_id, 
+              u.id AS user_id, 
+              u.name AS user_name
+            FROM user_subscription c
+            LEFT JOIN user u ON c.user_id = u.id
+            WHERE c.id = ?
+          `;
+
+          db.query(selectSql, [subscriptionId], (selectError, selectResult) => {
+            if (selectError) {
+              console.error("Error while fetching subscription details:", selectError);
+              return reject(selectError);
+            }
+
+            const result = selectResult[0]; // Assuming there is only one result
+            const subscriptionDetails = {
+              subscription_id: result.subscription_id,
+              sub_id: result.sub_id,
+              user: {
+                id: result.user_id,
+                name: result.user_name
+              }
+            };
+
+            resolve(subscriptionDetails);
+          });
+        } else {
+          const errorMessage = "Failed to create user subscription";
+          reject(errorMessage);
+        }
+      });
+    });
+  });
+}
+
+
+
+ async function ListAllSubId() {
+  return new Promise((resolve, reject) => {
+    const query= "SELECT * FROM subscription ";
+    db.query(query, (err, results) => {
+      if (err) {
+        reject(err);
+      } else {
+       resolve(results);
+      }
+    });
+  });
+}
+
+
+
+
+
+
 module.exports = {
   sellergister,
   checkname,
@@ -309,5 +410,8 @@ module.exports = {
   storeOTP,
   checkphone,
   verifyOTP,
-  changePassword
+  changePassword,
+  checkSubId,
+  userSubscription,
+  ListAllSubId
 };

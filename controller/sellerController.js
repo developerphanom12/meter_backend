@@ -176,6 +176,68 @@ const changePasswordHandler = async (req, res) => {
     });
   }
 };
+const userSubscription = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const { sub_id } = req.body;
+
+    const subId = await sellerService.checkSubId(sub_id);
+    if (!subId) {
+      return res.status(404).json({ status: 404, message: "Subscription ID not found" });
+    }
+
+    const subscriptionDetails = await sellerService.userSubscription(sub_id, userId);
+
+    if (subscriptionDetails) {
+      return res.status(201).json({
+        status: 201,
+        data: subscriptionDetails 
+      });
+    } else {
+      return res.status(500).json({
+        status: 500,
+        error: "Failed to add user subscription",
+        message: "Error occurred while creating subscription"
+      });
+    }
+  } catch (error) {
+    console.error("Error in add subscription:", error);
+    res.status(500).json({
+      status: 500,
+      error: "Failed to add user subscription",
+      message: error.message,
+      stack: error.stack,
+    });
+  }
+};
+
+const ListSubscription = async (req, res) => {
+  if (req.user.role !== "user") {
+    return res.status(403).json({
+      status: 403,
+      error: "Forbidden. Only seller can activate gig.",
+    });
+  }
+  
+  try {
+    const result = await sellerService.ListAllSubId();
+
+    res.status(200).json({
+      status: 200,
+      data: result,
+      
+    });
+  } catch (error) {
+    console.error("Error listing subscriptions:", error);
+    res.status(500).json({
+      status: 500,
+      error: "Failed to list subscriptions",
+      message: error.message,
+    });
+  }
+};
+
+
 
 module.exports = {
   createseller,
@@ -183,4 +245,6 @@ module.exports = {
   sendOTP,
   verifyOTPHandler,
   changePasswordHandler,
+  userSubscription,
+  ListSubscription
 };

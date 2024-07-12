@@ -82,9 +82,25 @@ const validateForgetPassword = (req, res, next) => {
 };
 
 
+const subscription = Joi.object({
+  sub_id: Joi.string().pattern(/^[0-9]+$/).required(),
+});
+const validateSubcription = (req, res, next) => {
+  const { error } = subscription.validate(req.body);
+
+  if (error) {
+    return res.status(400).json({ error: error.details[0].message });
+  }
+
+  next();
+};
+
+
+
 module.exports = { 
   validateSeller,
   validateotp,
   verifyOtp,
-  validateForgetPassword
+  validateForgetPassword,
+  validateSubcription
 };
