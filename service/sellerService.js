@@ -1,12 +1,11 @@
 const db = require("../Database/connection");
 const bcrypt = require("bcrypt");
-const { func } = require("joi");
 const jwt = require("jsonwebtoken");
-const dotenv = require('dotenv')
+const dotenv = require("dotenv");
+const { resposne } = require("../Middleware/resposne");
 let saltRounds = 10;
 dotenv.config();
-const JWT_SECRET = process.env.JWT_SECRET || "secret"; // Ensure this is set in your environment variables
-console.log("lfgjkfdjgkdfg",JWT_SECRET)
+const JWT_SECRET = process.env.JWT_SECRET || "secret";
 
 function sellergister(
   name,
@@ -30,7 +29,7 @@ function sellergister(
       password,
       address,
       company_name,
-      gst_number
+      gst_number,
     ];
 
     db.query(insertSql, values, (error, result) => {
@@ -52,8 +51,6 @@ function sellergister(
   });
 }
 
-
-
 function checkname(name) {
   return new Promise((resolve, reject) => {
     const query = "SELECT * FROM user WHERE name = ?";
@@ -66,7 +63,6 @@ function checkname(name) {
     });
   });
 }
-
 
 function checkphone(mobile_number) {
   return new Promise((resolve, reject) => {
@@ -81,9 +77,6 @@ function checkphone(mobile_number) {
   });
 }
 
-
-
-
 function checkemail(email) {
   return new Promise((resolve, reject) => {
     const query = "SELECT * FROM user WHERE email = ?";
@@ -97,10 +90,22 @@ function checkemail(email) {
   });
 }
 
+function checkphone(mobile_number) {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT * FROM user WHERE mobile_number = ?";
+    db.query(query, [mobile_number], (err, results) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(results.length > 0 ? true : false);
+      }
+    });
+  });
+}
 
-function loginseller(email, password, callback) {
-  const query = "SELECT * FROM user  WHERE email = ?";
-  db.query(query, [email], async (err, results) => {
+function loginseller(emailOrMobile, password, callback) {
+  const query = "SELECT * FROM user WHERE email = ? OR mobile_number = ?";
+  db.query(query, [emailOrMobile, emailOrMobile], async (err, results) => {
     if (err) {
       return callback(err, null);
     }
@@ -117,7 +122,7 @@ function loginseller(email, password, callback) {
       return callback(null, { error: "Invalid password" });
     }
 
-    const secretKey = "secretkey";
+    const secretKey = JWT_SECRET;
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       secretKey
@@ -127,7 +132,7 @@ function loginseller(email, password, callback) {
       data: {
         id: user.id,
         email: user.email,
-        password: user.password,
+        mobile: user.mobile,
         role: user.role,
         token: token,
       },
@@ -135,46 +140,42 @@ function loginseller(email, password, callback) {
   });
 }
 
+// function sellergister(
+//   mobile_number,
+//   otp
+// ) {
+//   return new Promise((resolve, reject) => {
+//     const insertSql = `
+//     INSERT INTO user_otp(mobile_number, otp)
+//     VALUES (?, ?)
+//     `;
 
+//     const values = [
+//       mobile_number,
+//       otp
+//     ];
 
-function sellergister(
-  mobile_number,
-  otp
-) {
-  return new Promise((resolve, reject) => {
-    const insertSql = `
-    INSERT INTO user_otp(mobile_number, otp) 
-    VALUES (?, ?)
-    `;
+//     db.query(insertSql, values, (error, result) => {
+//       if (error) {
+//         console.error("Error While inserting data:", error);
+//         reject(error);
+//       } else {
+//         const sellerId = result.insertId;
 
-    const values = [
-      mobile_number,
-      otp
-    ];
-
-    db.query(insertSql, values, (error, result) => {
-      if (error) {
-        console.error("Error While inserting data:", error);
-        reject(error);
-      } else {
-        const sellerId = result.insertId;
-
-        if (sellerId > 0) {
-          const successMessage = "otp send successfully";
-          resolve(successMessage);
-        } else {
-          const errorMessage = "Failed to send otp";
-          reject(errorMessage);
-        }
-      }
-    });
-  });
-}
-
-
+//         if (sellerId > 0) {
+//           const successMessage = "otp send successfully";
+//           resolve(successMessage);
+//         } else {
+//           const errorMessage = "Failed to send otp";
+//           reject(errorMessage);
+//         }
+//       }
+//     });
+//   });
+// }
 
 function generateOTP() {
-  let OTP = '123456';
+  let OTP = "123456";
   return OTP;
 }
 
@@ -226,13 +227,6 @@ function storeOTP(mobile_number, otp) {
   });
 }
 
-// // Function to generate a JWT token
-// function generateToken(mobile_number) {
-//   const token = jwt.sign({ mobile_number }, JWT_SECRET, { expiresIn: '1h' });
-//   return token;
-// }
-
-
 function verifyOTP(mobile_number, otp) {
   return new Promise((resolve, reject) => {
     const selectSql = `
@@ -241,7 +235,7 @@ function verifyOTP(mobile_number, otp) {
     const updateSql = `
       UPDATE user_otp SET is_verified = 1 WHERE mobile_number = ? AND otp = ?
     `;
-    
+
     db.query(selectSql, [mobile_number, otp], (error, results) => {
       if (error) {
         console.error("Error while selecting data:", error);
@@ -249,35 +243,35 @@ function verifyOTP(mobile_number, otp) {
       } else if (results.length === 0) {
         reject(new Error("Invalid OTP"));
       } else {
-        db.query(updateSql, [mobile_number, otp], (updateError, updateResult) => {
-          if (updateError) {
-            console.error("Error while updating data:", updateError);
-            reject(updateError);
-          } else {
-            resolve("OTP verified successfully and is_verified updated");
+        db.query(
+          updateSql,
+          [mobile_number, otp],
+          (updateError, updateResult) => {
+            if (updateError) {
+              console.error("Error while updating data:", updateError);
+              reject(updateError);
+            } else {
+              resolve("OTP verified successfully");
+            }
           }
-        });
+        );
       }
     });
   });
 }
 
-// Verify OTP and Change Password Function
 async function changePassword({ mobile_number, password }) {
   return new Promise((resolve, reject) => {
-    const selectSql = `
-      SELECT * FROM user_otp WHERE mobile_number = ? AND is_verified = 1
-    `;
-    const updateSql = `
-      UPDATE user SET password = ? WHERE mobile_number = ?
-    `;
-    
-    db.query(selectSql, mobile_number, async (error, results) => {
+    const selectSql =
+      "SELECT * FROM user_otp WHERE mobile_number = ? AND is_verified = 1";
+    const updateSql = "UPDATE user SET password = ? WHERE mobile_number = ?";
+
+    db.query(selectSql, [mobile_number], async (error, results) => {
       if (error) {
         console.error("Error while selecting data:", error);
         return reject(error);
       }
-      
+
       if (results.length === 0) {
         return reject(new Error("OTP not verified"));
       }
@@ -285,7 +279,7 @@ async function changePassword({ mobile_number, password }) {
       try {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        db.query(updateSql, [hashedPassword, mobile_number], (updateError, updateResult) => {
+        db.query(updateSql, [hashedPassword, mobile_number], (updateError) => {
           if (updateError) {
             console.error("Error while updating data:", updateError);
             return reject(updateError);
@@ -301,8 +295,6 @@ async function changePassword({ mobile_number, password }) {
   });
 }
 
-
-
 function checkSubId(sub_id) {
   return new Promise((resolve, reject) => {
     const query = "SELECT * FROM subscription WHERE id = ?";
@@ -315,6 +307,7 @@ function checkSubId(sub_id) {
     });
   });
 }
+
 function userSubscription(sub_id, userId) {
   return new Promise((resolve, reject) => {
     const updateSql = `
@@ -328,7 +321,10 @@ function userSubscription(sub_id, userId) {
 
     db.query(updateSql, [userId], (updateError, updateResult) => {
       if (updateError) {
-        console.error("Error while marking previous subscriptions as deleted:", updateError);
+        console.error(
+          "Error while marking previous subscriptions as deleted:",
+          updateError
+        );
         return reject(updateError);
       }
 
@@ -356,7 +352,10 @@ function userSubscription(sub_id, userId) {
 
           db.query(selectSql, [subscriptionId], (selectError, selectResult) => {
             if (selectError) {
-              console.error("Error while fetching subscription details:", selectError);
+              console.error(
+                "Error while fetching subscription details:",
+                selectError
+              );
               return reject(selectError);
             }
 
@@ -366,8 +365,8 @@ function userSubscription(sub_id, userId) {
               sub_id: result.sub_id,
               user: {
                 id: result.user_id,
-                name: result.user_name
-              }
+                name: result.user_name,
+              },
             };
 
             resolve(subscriptionDetails);
@@ -381,23 +380,32 @@ function userSubscription(sub_id, userId) {
   });
 }
 
-
-
- async function ListAllSubId() {
+async function ListAllSubId() {
   return new Promise((resolve, reject) => {
-    const query= "SELECT * FROM subscription ";
+    const query = "SELECT * FROM subscription ";
     db.query(query, (err, results) => {
       if (err) {
         reject(err);
       } else {
-       resolve(results);
+        resolve(results);
       }
     });
   });
 }
 
-
-
+function checkphoneotp(mobile_number) {
+  return new Promise((resolve, reject) => {
+    const query =
+      "SELECT * FROM user_otp WHERE mobile_number = ? AND is_verified = 1";
+    db.query(query, [mobile_number], (err, results) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(results.length > 0);
+      }
+    });
+  });
+}
 
 
 
@@ -413,5 +421,6 @@ module.exports = {
   changePassword,
   checkSubId,
   userSubscription,
-  ListAllSubId
+  ListAllSubId,
+  checkphoneotp,
 };

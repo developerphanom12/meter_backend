@@ -23,7 +23,31 @@ const validateSeller = (req, res, next) => {
 };
 
 
+const userlogin = Joi.object({
+  emailOrMobile: Joi.string()
+    .required()
+    .custom((value, helpers) => {
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const mobilePattern = /^[0-9]{10,}$/;
 
+      if (emailPattern.test(value) || mobilePattern.test(value)) {
+        return value;
+      }
+      
+      return helpers.message('Invalid email or mobile number. Mobile number must be at least 10 digits long.');
+    }),
+  password: Joi.string().max(16).min(8).required()
+});
+
+const validateusers = (req, res, next) => {
+  const { error } = userlogin.validate(req.body);
+
+  if (error) {
+    return res.status(400).json({ error: error.details[0].message });
+  }
+
+  next();
+};
 
 
 const OTPsend = Joi.object({
@@ -102,5 +126,6 @@ module.exports = {
   validateotp,
   verifyOtp,
   validateForgetPassword,
-  validateSubcription
+  validateSubcription,
+  validateusers
 };
