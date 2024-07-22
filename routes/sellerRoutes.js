@@ -1,17 +1,18 @@
 const express = require('express')
 const router = express.Router();
 const sellercontroller = require('../controller/sellerController');
-const { validateSeller, validateotp, verifyOtp, validateForgetPassword, validateSubcription,validateusers } = require('../Validation/Validation');
+const { validateSeller, validateotp, verifyOtp, validateForgetPassword, validateSubcription,validateusers, validateOtpVerify } = require('../Validation/Validation');
 const authenticateToken = require('../Middleware/Authentication');
 
 
 //---------------------user-Register Process ---------------------------//
 
-router.post('/user-register', validateSeller, sellercontroller.createseller);
+router.post('/user-registesssr', validateSeller, sellercontroller.createseller);
 router.post('/user-login',validateusers, sellercontroller.loginseller);
 router.post('/user-otp', validateotp, sellercontroller.sendOTP);
 router.post('/user-verifyOtp',verifyOtp, sellercontroller.verifyOTPHandler);
 router.post('/user-passwordchange', validateForgetPassword,sellercontroller.changePasswordHandler);
+router.post('/user-otpverify',validateOtpVerify, sellercontroller.verifyUserRegisterOtp);
 
 
 

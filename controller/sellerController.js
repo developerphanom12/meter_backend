@@ -1,3 +1,4 @@
+const { response } = require("express");
 const { resposne } = require("../Middleware/resposne");
 const sellerService = require("../service/sellerService");
 const bcrypt = require("bcrypt");
@@ -16,8 +17,6 @@ const createseller = async (req, res) => {
       gst_number,
     } = req.body;
 
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
     const namecheck = await sellerService.checkname(name);
     if (namecheck) {
       return res.status(404).json({
@@ -28,18 +27,23 @@ const createseller = async (req, res) => {
 
     const emailcheck = await sellerService.checkemail(email);
     if (emailcheck) {
-      return res
-        .status(404)
-        .json({ status: resposne.successFalse, message: resposne.checkEmail });
+      return res.status(404).json({
+        status: resposne.successFalse,
+        message: resposne.checkEmail,
+      });
     }
 
     const phone = await sellerService.checkphone(mobile_number);
     if (phone) {
-      return res
-        .status(404)
-        .json({ status: resposne.successFalse, message: resposne.checkphone });
+      return res.status(404).json({
+        status: resposne.successFalse,
+        message: resposne.checkphone,
+      });
     }
-    const datacreate = await sellerService.sellergister(
+
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const userid = await sellerService.sellergister(
       name,
       mobile_number,
       email,
@@ -49,26 +53,34 @@ const createseller = async (req, res) => {
       gst_number
     );
 
-    if (datacreate) {
-      res.status(201).json({
-        status: resposne.successTrue,
-        message: datacreate,
-      });
+    if (userid) {
+      const otp = sellerService.generateOTP();
+      const otpsend = await sellerService.RegisterOtp(userid, otp, mobile_number);
+
+      if (otpsend) {
+        res.status(201).json({
+          status: resposne.successTrue,
+          message: resposne.otpsend,
+        });
+      } else {
+        res.status(500).json({
+          status: resposne.successFalse,
+          message:resposne.failedotp,
+        });
+      }
     } else {
       res.status(500).json({
         status: resposne.successFalse,
-        message: resposne.userfailed,
+        message:resposne.userfailed,
       });
     }
   } catch (error) {
     res.status(500).json({
       status: resposne.successFalse,
-      error: resposne.userfailed,
       message: error.message,
     });
   }
 };
-
 const loginseller = async (req, res) => {
   const { emailOrMobile, password } = req.body;
   try {
@@ -145,23 +157,22 @@ const verifyOTPHandler = async (req, res) => {
   try {
     const phone = await sellerService.checkphone(mobile_number);
     if (!phone) {
-      return res
-        .status(404)
-        .json({
-          status: resposne.successFalse,
-          message: resposne.checkphonetop,
-        });
+      return res.status(404).json({
+        status: "response.successFalse",
+        message: "Invalid phone number",
+      });
     }
 
     const result = await sellerService.verifyOTP(mobile_number, otp);
 
     res.status(200).json({
-      status: resposne.successTrue,
-      message: result,
+      status: "response.successTrue",
+      message: result.message,
+      data: result.data,
     });
   } catch (error) {
     res.status(400).json({
-      status: resposne.successFalse,
+      status: "response.successFalse",
       message: error.message,
     });
   }
@@ -255,6 +266,33 @@ const ListSubscription = async (req, res) => {
   }
 };
 
+const verifyUserRegisterOtp = async (req, res) => {
+  const { mobile_number, otp } = req.body;
+
+  try {
+    const phone = await sellerService.checkphone(mobile_number);
+    if (!phone) {
+      return res.status(404).json({
+        status: resposne.successFalse,
+        message: "Invalid phone number",
+      });
+    }
+
+    const result = await sellerService.verifyUserOtp(mobile_number, otp);
+
+    res.status(200).json({
+      status: resposne.successTrue,
+      message: result.message,
+      data: result.data,
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: response.successFalse,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   createseller,
   loginseller,
@@ -263,4 +301,5 @@ module.exports = {
   changePasswordHandler,
   userSubscription,
   ListSubscription,
+  verifyUserRegisterOtp
 };

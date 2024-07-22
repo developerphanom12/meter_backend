@@ -18,8 +18,8 @@ function sellergister(
 ) {
   return new Promise((resolve, reject) => {
     const insertSql = `
-    INSERT INTO user( name, mobile_number, email, password, address, company_name, gst_number) 
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO user (name, mobile_number, email, password, address, company_name, gst_number) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -34,19 +34,64 @@ function sellergister(
 
     db.query(insertSql, values, (error, result) => {
       if (error) {
-        console.error("Error While inserting data:", error);
+        console.error("Error while inserting data:", error);
         reject(error);
       } else {
         const sellerId = result.insertId;
-
-        if (sellerId > 0) {
-          const successMessage = "Created user successfully";
-          resolve(successMessage);
+        if (sellerId) {
+          resolve(sellerId);
         } else {
-          const errorMessage = "Failed to create seller";
-          reject(errorMessage);
+          reject(new Error("Failed to create seller"));
         }
       }
+    });
+  });
+}
+
+function RegisterOtp(userid, otp, mobile_number) {
+  return new Promise((resolve, reject) => {
+    const deleteSql = `
+      DELETE FROM register_otp_verify WHERE mobile_number = ?
+    `;
+    const insertSql = `
+      INSERT INTO register_otp_verify (userid, otp, mobile_number)
+      VALUES (?, ?, ?)
+    `;
+    db.beginTransaction((err) => {
+      if (err) {
+        console.error("Error starting transaction:", err);
+        return reject(err);
+      }
+
+      db.query(deleteSql, [mobile_number], (error) => {
+        if (error) {
+          return db.rollback(() => {
+            console.error("Error deleting existing OTP:", error);
+            reject(error);
+          });
+        }
+
+        db.query(insertSql, [userid, otp, mobile_number], (error, result) => {
+          if (error) {
+            return db.rollback(() => {
+              console.error("Error while inserting data:", error);
+              reject(error);
+            });
+          }
+
+          db.commit((err) => {
+            if (err) {
+              return db.rollback(() => {
+                console.error("Error committing transaction:", err);
+                reject(err);
+              });
+            }
+
+            const successMessage = "OTP sent successfully";
+            resolve(successMessage);
+          });
+        });
+      });
     });
   });
 }
@@ -124,7 +169,7 @@ function loginseller(emailOrMobile, password, callback) {
 
     const secretKey = JWT_SECRET;
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role,mobile_number:user.mobile_number },
       secretKey
     );
     console.log("token", token);
@@ -132,7 +177,7 @@ function loginseller(emailOrMobile, password, callback) {
       data: {
         id: user.id,
         email: user.email,
-        mobile: user.mobile,
+        mobile_number: user.mobile_number,
         role: user.role,
         token: token,
       },
@@ -407,7 +452,91 @@ function checkphoneotp(mobile_number) {
   });
 }
 
+function updateOtpUserId(userid, mobile_number) {
+  return new Promise((resolve, reject) => {
+    const updateSql = `
+      UPDATE register_otp_verify SET userid = ? WHERE mobile_number = ?
+    `;
+    db.query(updateSql, [userid, mobile_number], (error, result) => {
+      if (error) {
+        console.error("Error while updating OTP with user ID:", error);
+        reject(error);
+      } else {
+        resolve("OTP updated with user ID successfully");
+      }
+    });
+  });
+}
 
+function verifyUserOtp(mobile_number, otp) {
+  return new Promise((resolve, reject) => {
+    const selectOtpSql = `
+      SELECT * FROM register_otp_verify WHERE mobile_number = ? AND otp = ?
+    `;
+    const updateOtpSql = `
+      UPDATE register_otp_verify SET is_verified = 1 WHERE mobile_number = ? AND otp = ?
+    `;
+    const selectUserSql = `
+      SELECT * FROM user WHERE id = ?
+    `;
+
+    db.query(selectOtpSql, [mobile_number, otp], (error, results) => {
+      if (error) {
+        console.error("Error while selecting OTP data:", error);
+        return reject(error);
+      }
+      if (results.length === 0) {
+        return reject(new Error("Invalid OTP"));
+      }
+
+      const userOtpData = results[0];
+      const userid = userOtpData.userid;
+
+      db.query(
+        updateOtpSql,
+        [mobile_number, otp],
+        (updateError, updateResult) => {
+          if (updateError) {
+            return reject(updateError);
+          }
+
+          db.query(selectUserSql, [userid], (userError, userResults) => {
+            if (userError) {
+              return reject(userError);
+            }
+            if (userResults.length === 0) {
+              return reject(new Error("User not found"));
+            }
+
+            const userData = userResults[0];
+            const secretKey = process.env.JWT_SECRET;
+            const token = jwt.sign(
+              {
+                id: userData.id,
+                email: userData.email,
+                role: userData.role,
+                mobile_number: userData.mobile_number,
+              },
+              secretKey
+            );
+
+            console.log("token", token);
+            resolve({
+              message: "OTP verified successfully",
+              data: {
+                id: userData.id,
+                email: userData.email,
+                mobile: userData.mobile_number,
+                role: userData.role,
+                token: token,
+              },
+            });
+          });
+        }
+      );
+    });
+  });
+}
 
 module.exports = {
   sellergister,
@@ -423,4 +552,7 @@ module.exports = {
   userSubscription,
   ListAllSubId,
   checkphoneotp,
+  RegisterOtp,
+  updateOtpUserId,
+  verifyUserOtp,
 };

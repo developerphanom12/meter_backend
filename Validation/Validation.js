@@ -121,11 +121,32 @@ const validateSubcription = (req, res, next) => {
 
 
 
+const verifyUserRegisterOtp = Joi.object({
+  mobile_number: Joi.string()
+    .length(10)
+    .pattern(/[6-9]{1}[0-9]{9}/)
+    .required(),
+    otp: Joi.string()
+    .length(6)
+    .pattern(/^[0-9]{6}$/)
+    .required(),
+});
+const validateOtpVerify = (req, res, next) => {
+  const { error } = verifyUserRegisterOtp.validate(req.body);
+
+  if (error) {
+    return res.status(400).json({ error: error.details[0].message });
+  }
+
+  next();
+};
+
 module.exports = { 
   validateSeller,
   validateotp,
   verifyOtp,
   validateForgetPassword,
   validateSubcription,
-  validateusers
+  validateusers,
+  validateOtpVerify
 };

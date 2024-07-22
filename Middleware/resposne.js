@@ -12,8 +12,10 @@
     lginmessage : "User Login Success",
     otpsend : "OTP Has Been Sent Successfully",
     checkphonetop: "Phonenumber Not Exist Our Record",
-    checksubscriptionId:"Subscription ID not found"
-
+    checksubscriptionId:"Subscription ID not found",
+    failedotp:"Failed To Send Otp",
+    verifyotp: "Verify Otp Successfull"
+    
   };
 
   module.exports ={
