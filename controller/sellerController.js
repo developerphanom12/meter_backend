@@ -158,7 +158,7 @@ const verifyOTPHandler = async (req, res) => {
     const phone = await sellerService.checkphone(mobile_number);
     if (!phone) {
       return res.status(404).json({
-        status: "response.successFalse",
+        status: resposne.successFalse,
         message: "Invalid phone number",
       });
     }
@@ -166,13 +166,13 @@ const verifyOTPHandler = async (req, res) => {
     const result = await sellerService.verifyOTP(mobile_number, otp);
 
     res.status(200).json({
-      status: "response.successTrue",
+      status: resposne.successTrue,
       message: result.message,
       data: result.data,
     });
   } catch (error) {
     res.status(400).json({
-      status: "response.successFalse",
+      status: resposne.successFalse,
       message: error.message,
     });
   }
