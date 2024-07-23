@@ -7,7 +7,7 @@ const authenticateToken = require('../Middleware/Authentication');
 
 //---------------------user-Register Process ---------------------------//
 
-router.post('/user-registesssr', validateSeller, sellercontroller.createseller);
+router.post('/user-register', validateSeller, sellercontroller.createseller);
 router.post('/user-login',validateusers, sellercontroller.loginseller);
 router.post('/user-otp', validateotp, sellercontroller.sendOTP);
 router.post('/user-verifyOtp',verifyOtp, sellercontroller.verifyOTPHandler);
