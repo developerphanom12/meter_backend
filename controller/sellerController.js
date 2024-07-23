@@ -83,33 +83,49 @@ const createseller = async (req, res) => {
 };
 const loginseller = async (req, res) => {
   const { emailOrMobile, password } = req.body;
+
   try {
+    const verified = await sellerService.checkverifed(emailOrMobile);
+    if (!verified) {
+      return res.status(404).json({
+        status: resposne.successFalse,
+        message: "Your mobile number is not verified",
+      });
+    }
+
     sellerService.loginseller(emailOrMobile, password, (err, result) => {
       if (err) {
         console.error("Error:", err);
-        return res
-          .status(500)
-          .json({ status: resposne.successFalse, message: resposne.loginuser });
+        return res.status(500).json({
+          status: resposne.successFalse,
+          message: resposne.loginuser,
+        });
       }
 
       if (result.error) {
-        return res.status(401).json({ error: result.error });
+        return res.status(401).json({
+          status: resposne.successFalse,
+          message: result.error,
+        });
       }
 
       res.status(200).json({
         status: resposne.successTrue,
         message: resposne.lginmessage,
         data: result.data,
-        token: result.token,
       });
     });
   } catch (error) {
+    console.error("Error:", error);
     res.status(500).json({
       status: resposne.successFalse,
-      error: resposne.loginuser,
+      message: error.message,
     });
   }
 };
+
+
+module.exports = loginseller;
 
 const sendOTP = async (req, res) => {
   const { mobile_number } = req.body;

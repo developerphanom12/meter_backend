@@ -538,6 +538,26 @@ function verifyUserOtp(mobile_number, otp) {
   });
 }
 
+const checkverifed = (emailOrMobile) => {
+  return new Promise((resolve, reject) => {
+    const queryEmail = "SELECT * FROM register_otp_verify WHERE mobile_number = (SELECT mobile_number FROM user WHERE email = ?)";
+    const queryMobile = "SELECT * FROM register_otp_verify WHERE mobile_number = ?";
+    
+    const query = emailOrMobile.includes('@') ? queryEmail : queryMobile;
+
+    db.query(query, [emailOrMobile], (err, results) => {
+      if (err) {
+        return reject(err);
+      }
+      if (results.length === 0 || results[0].is_verified !== 1) {
+        return reject(new Error("Your mobile number is not verified"));
+      }
+      resolve(true);
+    });
+  });
+};
+
+
 module.exports = {
   sellergister,
   checkname,
@@ -555,4 +575,5 @@ module.exports = {
   RegisterOtp,
   updateOtpUserId,
   verifyUserOtp,
+  checkverifed
 };
