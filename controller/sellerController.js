@@ -163,12 +163,11 @@ const verifyOTPHandler = async (req, res) => {
       });
     }
 
-    const result = await sellerService.verifyOTP(mobile_number, otp);
+     await sellerService.verifyOTP(mobile_number, otp);
 
     res.status(200).json({
       status: resposne.successTrue,
-      message: result.message,
-      data: result.data,
+      message: "OTP verified successfully",
     });
   } catch (error) {
     res.status(400).json({
