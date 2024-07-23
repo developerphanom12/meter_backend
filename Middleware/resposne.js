@@ -1,7 +1,7 @@
 
  const resposne = {
-    successTrue: 'True',
-    successFalse: 'False',
+    successTrue: true,
+    successFalse: false,
     usercreate: 'Create User Successfull',
     userotp: ' User Send Otp Successfull',
     userfailed : "Failed To Create User",
