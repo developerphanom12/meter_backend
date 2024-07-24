@@ -19,7 +19,7 @@ const createseller = async (req, res) => {
 
     const namecheck = await sellerService.checkname(name);
     if (namecheck) {
-      return res.status(404).json({
+      return res.status(400).json({
         status: resposne.successFalse,
         message: resposne.checkusername,
       });
@@ -27,7 +27,7 @@ const createseller = async (req, res) => {
 
     const emailcheck = await sellerService.checkemail(email);
     if (emailcheck) {
-      return res.status(404).json({
+      return res.status(400).json({
         status: resposne.successFalse,
         message: resposne.checkEmail,
       });
@@ -35,7 +35,7 @@ const createseller = async (req, res) => {
 
     const phone = await sellerService.checkphone(mobile_number);
     if (phone) {
-      return res.status(404).json({
+      return res.status(400).json({
         status: resposne.successFalse,
         message: resposne.checkphone,
       });
@@ -58,7 +58,7 @@ const createseller = async (req, res) => {
       const otpsend = await sellerService.RegisterOtp(userid, otp, mobile_number);
 
       if (otpsend) {
-        res.status(201).json({
+        res.status(200).json({
           status: resposne.successTrue,
           message: resposne.otpsend,
         });
@@ -69,13 +69,13 @@ const createseller = async (req, res) => {
         });
       }
     } else {
-      res.status(500).json({
+      res.status(400).json({
         status: resposne.successFalse,
         message:resposne.userfailed,
       });
     }
   } catch (error) {
-    res.status(500).json({
+    res.status(400).json({
       status: resposne.successFalse,
       message: error.message,
     });
@@ -87,7 +87,7 @@ const loginseller = async (req, res) => {
   try {
     const verified = await sellerService.checkverifed(emailOrMobile);
     if (!verified) {
-      return res.status(404).json({
+      return res.status(400).json({
         status: resposne.successFalse,
         message: "Your mobile number is not verified",
       });
@@ -95,15 +95,14 @@ const loginseller = async (req, res) => {
 
     sellerService.loginseller(emailOrMobile, password, (err, result) => {
       if (err) {
-        console.error("Error:", err);
-        return res.status(500).json({
+        return res.status(400).json({
           status: resposne.successFalse,
           message: resposne.loginuser,
         });
       }
 
       if (result.error) {
-        return res.status(401).json({
+        return res.status(400).json({
           status: resposne.successFalse,
           message: result.error,
         });
@@ -117,7 +116,7 @@ const loginseller = async (req, res) => {
     });
   } catch (error) {
     console.error("Error:", error);
-    res.status(500).json({
+    res.status(400).json({
       status: resposne.successFalse,
       message: error.message,
     });
@@ -134,7 +133,7 @@ const sendOTP = async (req, res) => {
     const phoneExists = await sellerService.checkphone(mobile_number);
 
     if (!phoneExists) {
-      return res.status(404).json({
+      return res.status(400).json({
         status: resposne.successFalse,
         message: "The provided phone number does not exist in our records",
       });
@@ -144,22 +143,20 @@ const sendOTP = async (req, res) => {
 
     try {
       await sellerService.storeOTP(mobile_number, otp);
-      res.status(201).json({
+      res.status(200).json({
         status: resposne.successTrue,
         message: resposne.otpsend,
         otp: otp,
       });
     } catch (storeError) {
-      console.error("Error storing OTP:", storeError);
-      res.status(500).json({
-        status: "failure",
+      res.status(400).json({
+        status: false,
         error: "Failed to store OTP",
-        message: storeError.message,
       });
     }
   } catch (error) {
     console.error("Error sending OTP:", error);
-    res.status(500).json({
+    res.status(400).json({
       status: "failure",
       error: "Failed to send OTP",
       message: error.message,
@@ -173,7 +170,7 @@ const verifyOTPHandler = async (req, res) => {
   try {
     const phone = await sellerService.checkphone(mobile_number);
     if (!phone) {
-      return res.status(404).json({
+      return res.status(400).json({
         status: resposne.successFalse,
         message: "Invalid phone number",
       });
@@ -200,7 +197,7 @@ const changePasswordHandler = async (req, res) => {
     const phoneExists = await sellerService.checkphoneotp(mobile_number);
 
     if (!phoneExists) {
-      return res.status(404).json({
+      return res.status(400).json({
         status: resposne.successFalse,
         message: "OTP NOT VERIFIED",
       });
@@ -211,13 +208,13 @@ const changePasswordHandler = async (req, res) => {
       password,
     });
 
-    res.status(201).json({
+    res.status(200).json({
       status: resposne.successTrue,
       message: result,
     });
   } catch (error) {
-    res.status(500).json({
-      status: 500,
+    res.status(400).json({
+      status: false,
       message: error.message,
     });
   }
