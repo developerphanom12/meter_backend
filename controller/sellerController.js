@@ -63,7 +63,7 @@ const createseller = async (req, res) => {
           message: resposne.otpsend,
         });
       } else {
-        res.status(500).json({
+        res.status(400).json({
           status: resposne.successFalse,
           message:resposne.failedotp,
         });
@@ -241,13 +241,13 @@ const userSubscription = async (req, res) => {
         data: subscriptionDetails,
       });
     } else {
-      return res.status(500).json({
+      return res.status(400).json({
         status: resposne.successFalse,
         error: "Failed to add user subscription",
       });
     }
   } catch (error) {
-    res.status(500).json({
+    res.status(400).json({
       status: resposne.successFalse,
       message: error.message,
     });
@@ -270,7 +270,7 @@ const ListSubscription = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(400).json({
       status: resposne.successFalse,
       message: error.message,
     });
