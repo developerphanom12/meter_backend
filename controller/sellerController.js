@@ -146,7 +146,6 @@ const sendOTP = async (req, res) => {
       res.status(200).json({
         status: resposne.successTrue,
         message: resposne.otpsend,
-        otp: otp,
       });
     } catch (storeError) {
       res.status(400).json({
@@ -299,7 +298,7 @@ const verifyUserRegisterOtp = async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({
-      status: response.successFalse,
+      status: resposne.successFalse,
       message: error.message,
     });
   }
