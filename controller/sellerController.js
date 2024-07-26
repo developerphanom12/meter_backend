@@ -2,7 +2,6 @@ const { response } = require("express");
 const { resposne } = require("../Middleware/resposne");
 const sellerService = require("../service/sellerService");
 const bcrypt = require("bcrypt");
-
 let saltRounds = 10;
 
 const createseller = async (req, res) => {
