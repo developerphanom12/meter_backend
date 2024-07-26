@@ -1,7 +1,7 @@
 
  const resposne = {
-    successTrue: 'True',
-    successFalse: 'False',
+    successTrue: true,
+    successFalse: false,
     usercreate: 'Create User Successfull',
     userotp: ' User Send Otp Successfull',
     userfailed : "Failed To Create User",
@@ -14,7 +14,8 @@
     checkphonetop: "Phonenumber Not Exist Our Record",
     checksubscriptionId:"Subscription ID not found",
     failedotp:"Failed To Send Otp",
-    verifyotp: "Verify Otp Successfull"
+    verifyotp: "Verify Otp Successfull",
+    socialogin:"social login successfully"
     
   };
 

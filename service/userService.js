@@ -7,30 +7,14 @@ let saltRounds = 10;
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
 
-function sellergister(
-  name,
-  mobile_number,
-  email,
-  password,
-  address,
-  company_name,
-  gst_number
-) {
+function sellergister(name, email, password, mobile_number) {
   return new Promise((resolve, reject) => {
     const insertSql = `
-      INSERT INTO user (name, mobile_number, email, password, address, company_name, gst_number) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO user (name, email, password, mobile_number) 
+      VALUES (?, ?, ?, ?)
     `;
 
-    const values = [
-      name,
-      mobile_number,
-      email,
-      password,
-      address,
-      company_name,
-      gst_number,
-    ];
+    const values = [name, email, password, mobile_number];
 
     db.query(insertSql, values, (error, result) => {
       if (error) {
@@ -96,6 +80,47 @@ function RegisterOtp(userid, otp, mobile_number) {
   });
 }
 
+async function socialogin(google_id, apple_id) {
+  const query = "SELECT * FROM user WHERE google_id = ? OR apple_id = ?";
+
+  return new Promise((resolve, reject) => {
+    db.query(query, [google_id, apple_id], (err, results) => {
+      if (err) {
+        return reject(err);
+      }
+
+      if (results.length > 0) {
+        const user = results[0];
+        const token = jwt.sign(
+          {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            mobile_number: user.mobile_number,
+            is_location:user.is_location,
+            is_vehicle:user.is_vehicle
+          },
+          JWT_SECRET
+        );
+
+        return resolve({
+          data: {
+            id: user.id,
+            email: user.email,
+            mobile_number: user.mobile_number,
+            role: user.role,
+            is_location:user.is_location,
+            is_vehicle:user.is_vehicle,
+            token: token,
+          },
+        });
+      }
+
+      resolve({ error: "Invalid user" });
+    });
+  });
+}
+
 function checkname(name) {
   return new Promise((resolve, reject) => {
     const query = "SELECT * FROM user WHERE name = ?";
@@ -148,39 +173,64 @@ function checkphone(mobile_number) {
   });
 }
 
-function loginseller(emailOrMobile, password, callback) {
-  const query = "SELECT * FROM user WHERE email = ? OR mobile_number = ?";
-  db.query(query, [emailOrMobile, emailOrMobile], async (err, results) => {
-    if (err) {
-      return callback(err, null);
-    }
+function loginseller(mobile_number, password) {
+  const userQuery = "SELECT * FROM user WHERE mobile_number = ?";
 
-    if (results.length === 0) {
-      return callback(null, { error: "Invalid user" });
-    }
+  return new Promise((resolve, reject) => {
+    db.query(userQuery, [mobile_number], async (err, results) => {
+      if (err) {
+        return reject(err);
+      }
 
-    const user = results[0];
+      if (results.length === 0) {
+        return resolve({ error: "Invalid user" });
+      }
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
+      const user = results[0];
 
-    if (!passwordMatch) {
-      return callback(null, { error: "Invalid password" });
-    }
+      // Check if the user has social login fields
+      if (user.google_id || user.apple_id) {
+        return resolve({ error: "Login not allowed. Use social login." });
+      }
 
-    const secretKey = JWT_SECRET;
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role,mobile_number:user.mobile_number },
-      secretKey
-    );
-    console.log("token", token);
-    return callback(null, {
-      data: {
-        id: user.id,
-        email: user.email,
-        mobile_number: user.mobile_number,
-        role: user.role,
-        token: token,
-      },
+      // Ensure both password and user.password are defined
+      if (!password || !user.password) {
+        return resolve({ error: "Password is missing" });
+      }
+
+      const passwordMatch = await bcrypt.compare(password, user.password);
+
+      if (!passwordMatch) {
+        return resolve({ error: "Invalid password" });
+      }
+
+      const otpQuery = "SELECT is_verified FROM register_otp_verify WHERE mobile_number = ?";
+      db.query(otpQuery, [mobile_number], (otpErr, otpResults) => {
+        if (otpErr) {
+          return reject(otpErr);
+        }
+
+        if (otpResults.length === 0 || otpResults[0].is_verified !== 1) {
+          return resolve({ error: "Your mobile number is not verified" });
+        }
+
+        const token = jwt.sign(
+          { id: user.id, name: user.name, role: user.role, email:user.email ,is_location:user.is_location,
+            is_vehicle:user.is_vehicle },
+          process.env.JWT_SECRET
+        );
+
+        resolve({
+          data: {
+            id: user.id,
+            name: user.name,
+            role: user.role,
+            is_location:user.is_location,
+            is_vehicle:user.is_vehicle,
+            token: token,
+          },
+        });
+      });
     });
   });
 }
@@ -353,77 +403,7 @@ function checkSubId(sub_id) {
   });
 }
 
-function userSubscription(sub_id, userId) {
-  return new Promise((resolve, reject) => {
-    const updateSql = `
-      UPDATE user_subscription SET is_deleted = 1 WHERE user_id = ?
-    `;
 
-    const insertSql = `
-      INSERT INTO user_subscription (sub_id, user_id) 
-      VALUES (?, ?)
-    `;
-
-    db.query(updateSql, [userId], (updateError, updateResult) => {
-      if (updateError) {
-        console.error(
-          "Error while marking previous subscriptions as deleted:",
-          updateError
-        );
-        return reject(updateError);
-      }
-
-      const values = [sub_id, userId];
-      db.query(insertSql, values, (insertError, insertResult) => {
-        if (insertError) {
-          console.error("Error while inserting new subscription:", insertError);
-          return reject(insertError);
-        }
-
-        const subscriptionId = insertResult.insertId;
-
-        if (subscriptionId > 0) {
-          const selectSql = `
-            SELECT 
-              c.id AS subscription_id, 
-              c.sub_id, 
-              c.user_id, 
-              u.id AS user_id, 
-              u.name AS user_name
-            FROM user_subscription c
-            LEFT JOIN user u ON c.user_id = u.id
-            WHERE c.id = ?
-          `;
-
-          db.query(selectSql, [subscriptionId], (selectError, selectResult) => {
-            if (selectError) {
-              console.error(
-                "Error while fetching subscription details:",
-                selectError
-              );
-              return reject(selectError);
-            }
-
-            const result = selectResult[0]; // Assuming there is only one result
-            const subscriptionDetails = {
-              subscription_id: result.subscription_id,
-              sub_id: result.sub_id,
-              user: {
-                id: result.user_id,
-                name: result.user_name,
-              },
-            };
-
-            resolve(subscriptionDetails);
-          });
-        } else {
-          const errorMessage = "Failed to create user subscription";
-          reject(errorMessage);
-        }
-      });
-    });
-  });
-}
 
 async function ListAllSubId() {
   return new Promise((resolve, reject) => {
@@ -467,7 +447,6 @@ function updateOtpUserId(userid, mobile_number) {
     });
   });
 }
-
 function verifyUserOtp(mobile_number, otp) {
   return new Promise((resolve, reject) => {
     const selectOtpSql = `
@@ -490,60 +469,65 @@ function verifyUserOtp(mobile_number, otp) {
       }
 
       const userOtpData = results[0];
-      const userid = userOtpData.userid;
+      const userId = userOtpData.userid;
 
-      db.query(
-        updateOtpSql,
-        [mobile_number, otp],
-        (updateError, updateResult) => {
-          if (updateError) {
-            return reject(updateError);
+      console.log("User ID from OTP Data:", userId);
+
+      db.query(updateOtpSql, [mobile_number, otp], (updateError) => {
+        if (updateError) {
+          return reject(updateError);
+        }
+
+        db.query(selectUserSql, [userId], (userError, userResults) => {
+          if (userError) {
+            console.error("Error while selecting user data:", userError);
+            return reject(userError);
+          }
+          if (userResults.length === 0) {
+            console.log("No user found with ID:", userId);
+            return reject(new Error("User not found"));
           }
 
-          db.query(selectUserSql, [userid], (userError, userResults) => {
-            if (userError) {
-              return reject(userError);
-            }
-            if (userResults.length === 0) {
-              return reject(new Error("User not found"));
-            }
+          const userData = userResults[0];
+          console.log("User Data:", userData);
 
-            const userData = userResults[0];
-            const secretKey = process.env.JWT_SECRET;
-            const token = jwt.sign(
-              {
-                id: userData.id,
-                email: userData.email,
-                role: userData.role,
-                mobile_number: userData.mobile_number,
-              },
-              secretKey
-            );
+          const secretKey = process.env.JWT_SECRET;
+          const token = jwt.sign(
+            {
+              id: userData.id,
+              email: userData.email,
+              role: userData.role,
+              mobile_number: userData.mobile_number,
+            },
+            secretKey
+          );
 
-            console.log("token", token);
-            resolve({
-              message: "OTP verified successfully",
-              data: {
-                id: userData.id,
-                email: userData.email,
-                mobile: userData.mobile_number,
-                role: userData.role,
-                token: token,
-              },
-            });
+          console.log("Token:", token);
+          resolve({
+            message: "OTP verified successfully",
+            data: {
+              id: userData.id,
+              email: userData.email,
+              mobile_number: userData.mobile_number,
+              role: userData.role,
+              token: token,
+            },
           });
-        }
-      );
+        });
+      });
     });
   });
 }
 
+
 const checkverifed = (emailOrMobile) => {
   return new Promise((resolve, reject) => {
-    const queryEmail = "SELECT * FROM register_otp_verify WHERE mobile_number = (SELECT mobile_number FROM user WHERE email = ?)";
-    const queryMobile = "SELECT * FROM register_otp_verify WHERE mobile_number = ?";
-    
-    const query = emailOrMobile.includes('@') ? queryEmail : queryMobile;
+    const queryEmail =
+      "SELECT * FROM register_otp_verify WHERE mobile_number = (SELECT mobile_number FROM user WHERE email = ?)";
+    const queryMobile =
+      "SELECT * FROM register_otp_verify WHERE mobile_number = ?";
+
+    const query = emailOrMobile.includes("@") ? queryEmail : queryMobile;
 
     db.query(query, [emailOrMobile], (err, results) => {
       if (err) {
@@ -556,6 +540,197 @@ const checkverifed = (emailOrMobile) => {
     });
   });
 };
+
+const checkverifedmobile = (mobile_number) => {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT * FROM register_otp_verify WHERE mobile_number = ? AND is_verified = 1";
+
+    db.query(query, [mobile_number], (err, results) => {
+      if (err) {
+        return reject(err);
+      }
+      if (results.length === 0) {
+        return reject(new Error("Your mobile number is not verified"));
+      }
+      resolve(true);
+    });
+  });
+};
+
+
+function socialRegister(name, mobile_number, google_id, apple_id) {
+  return new Promise((resolve, reject) => {
+    const insertSql = `
+      INSERT INTO user (name, mobile_number, google_id, apple_id) 
+      VALUES (?, ?, ?, ?)
+    `;
+
+    const values = [name, mobile_number, google_id, apple_id];
+
+    db.query(insertSql, values, (error, result) => {
+      if (error) {
+        console.error("Error while inserting data:", error);
+        reject(error);
+      } else {
+        const sellerId = result.insertId;
+        if (sellerId) {
+          resolve({ id: sellerId });
+        } else {
+          reject(new Error("Failed to create seller"));
+        }
+      }
+    });
+  });
+}
+
+
+function checkphoneexisting(mobile_number) {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT * FROM register_otp_verify WHERE mobile_number = ? AND is_verified = 1";
+    db.query(query, [mobile_number], (err, results) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(results.length > 0 ? true : false);
+      }
+    });
+  });
+}
+
+function userSubscription(longitude, latitude, address, userId) {
+  return new Promise((resolve, reject) => {
+    // Step 1: Check if userId exists in user_location table
+    const checkSql = `
+      SELECT id FROM user_location WHERE userId = ?
+    `;
+
+    db.query(checkSql, [userId], (checkError, checkResult) => {
+      if (checkError) {
+        reject(checkError);
+      } else if (checkResult.length > 0) {
+        // Step 2: userId exists, delete the existing record
+        const deleteSql = `
+          DELETE FROM user_location WHERE userId = ?
+        `;
+
+        db.query(deleteSql, [userId], (deleteError, deleteResult) => {
+          if (deleteError) {
+            reject(deleteError);
+          } else {
+            // Step 3: Proceed to insert new record
+            const insertSql = `
+              INSERT INTO user_location (longitude, latitude, address, userId) 
+              VALUES (?, ?, ?, ?)
+            `;
+            const insertValues = [longitude, latitude, address, userId];
+
+            db.query(insertSql, insertValues, (insertError, insertResult) => {
+              if (insertError) {
+                reject(insertError);
+              } else {
+                resolve(insertResult.insertId);
+              }
+            });
+          }
+        });
+      } else {
+        // Step 4: userId does not exist, insert a new record
+        const insertSql = `
+          INSERT INTO user_location (longitude, latitude, address, userId) 
+          VALUES (?, ?, ?, ?)
+        `;
+        const insertValues = [longitude, latitude, address, userId];
+
+        db.query(insertSql, insertValues, (insertError, insertResult) => {
+          if (insertError) {
+            reject(insertError);
+          } else {
+            resolve(insertResult.insertId);
+          }
+        });
+      }
+    });
+  });
+}
+
+
+
+const updateUserLocation = (userId) => {
+  return new Promise((resolve, reject) => {
+    const updateSql = `
+      UPDATE user
+      SET is_vehicle = 1
+      WHERE id = ?
+    `;
+
+    db.query(updateSql, [userId], (error, result) => {
+      if (error) {
+        console.error("Error while updating user location:", error);
+        return reject(error);
+      }
+
+      if (result.affectedRows > 0) {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+  });
+};
+function userVehicle(carname, userId) {
+  return new Promise((resolve, reject) => {
+    const checkSql = `
+      SELECT id FROM user_vehicle WHERE userId = ?
+    `;
+
+    db.query(checkSql, [userId], (checkError, checkResult) => {
+      if (checkError) {
+        reject(checkError);
+      } else if (checkResult.length > 0) {
+        // UserId exists, delete the existing record
+        const deleteSql = `
+          DELETE FROM user_vehicle WHERE userId = ?
+        `;
+
+        db.query(deleteSql, [userId], (deleteError, deleteResult) => {
+          if (deleteError) {
+            reject(deleteError);
+          } else {
+            // Proceed to insert new record
+            const insertSql = `
+              INSERT INTO user_vehicle (carname, userId) 
+              VALUES (?, ?)
+            `;
+            const insertValues = [carname, userId];
+
+            db.query(insertSql, insertValues, (insertError, insertResult) => {
+              if (insertError) {
+                reject(insertError);
+              } else {
+                resolve(insertResult.insertId);
+              }
+            });
+          }
+        });
+      } else {
+        // UserId does not exist, insert a new record
+        const insertSql = `
+          INSERT INTO user_vehicle (carname, userId) 
+          VALUES (?, ?)
+        `;
+        const insertValues = [carname, userId];
+
+        db.query(insertSql, insertValues, (insertError, insertResult) => {
+          if (insertError) {
+            reject(insertError);
+          } else {
+            resolve(insertResult.insertId);
+          }
+        });
+      }
+    });
+  });
+}
 
 
 module.exports = {
@@ -575,5 +750,11 @@ module.exports = {
   RegisterOtp,
   updateOtpUserId,
   verifyUserOtp,
-  checkverifed
+  checkverifed,
+  socialogin,
+  socialRegister,
+  checkverifedmobile,
+  checkphoneexisting,
+  updateUserLocation,
+  userVehicle
 };

@@ -3,7 +3,7 @@ const app = express();
 const dotenv = require('dotenv');
 const path = require('path');
 const cors = require('cors');
-const user = require('./routes/sellerRoutes')
+const user = require('./routes/userRoutes')
 dotenv.config();
 
 app.use(express.json()); 
@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(cors({ origin: true })); 
 
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 6000;
 const ipAddress = '127.0.0.1';
 
 
