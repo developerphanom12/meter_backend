@@ -10,8 +10,8 @@ const WebSocket = require('ws');
 
 dotenv.config();
 
-app.use(express.json()); 
-app.use(cors({ origin: true })); 
+app.use(express.json());
+app.use(cors({ origin: true }));
 
 const port = process.env.PORT || 5000;
 
@@ -36,16 +36,19 @@ app.get('/', (req, res) => {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server, path: `/meter/1234` });
+const wss = new WebSocket.Server({ server, path: '/meter/1234' });
 
 wss.on('connection', (ws, req) => {
     const { url } = req;
     console.log(`WebSocket connection established on ${url}`);
 
     ws.on('message', (message) => {
-        console.log('Received:', message);
+
+        const messageStr = message.toString('utf-8');
+        console.log('Decoded message:', messageStr);
+
         try {
-            const data = JSON.parse(message);
+            const data = JSON.parse(messageStr);
 
             if (Array.isArray(data)) {
                 const [messageType, callId, action, payload] = data;
@@ -53,12 +56,18 @@ wss.on('connection', (ws, req) => {
                 switch (action) {
                     case 'BootNotification':
                         console.log('BootNotification:', payload);
-                        ws.send(JSON.stringify([3, callId, { status: 'Accepted', currentTime: new Date().toISOString(), interval: 5 }]));
+                        ws.send(JSON.stringify([3, callId, {
+                            status: 'Accepted',
+                            currentTime: new Date().toISOString(),
+                            interval: 5
+                        }]));
                         break;
 
                     case 'MeterValues':
                         console.log('MeterValues:', payload);
-                        ws.send(JSON.stringify([3, callId, { currentTime: new Date().toISOString() }]));
+                        ws.send(JSON.stringify([3, callId, {
+                            currentTime: new Date().toISOString()
+                        }]));
                         break;
 
                     default:
