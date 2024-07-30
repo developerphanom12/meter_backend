@@ -43,12 +43,9 @@ wss.on('connection', (ws, req) => {
     console.log(`WebSocket connection established on ${url}`);
 
     ws.on('message', (message) => {
-
-        const messageStr = message.toString('utf-8');
-        console.log('Decoded message:', messageStr);
-
+        console.log('Received:', message);
         try {
-            const data = JSON.parse(messageStr);
+            const data = JSON.parse(message);
 
             if (Array.isArray(data)) {
                 const [messageType, callId, action, payload] = data;
@@ -56,18 +53,12 @@ wss.on('connection', (ws, req) => {
                 switch (action) {
                     case 'BootNotification':
                         console.log('BootNotification:', payload);
-                        ws.send(JSON.stringify([3, callId, {
-                            status: 'Accepted',
-                            currentTime: new Date().toISOString(),
-                            interval: 5
-                        }]));
+                        ws.send(JSON.stringify([3, callId, { status: 'Accepted', currentTime: new Date().toISOString(), interval: 5 }]));
                         break;
 
                     case 'MeterValues':
                         console.log('MeterValues:', payload);
-                        ws.send(JSON.stringify([3, callId, {
-                            currentTime: new Date().toISOString()
-                        }]));
+                        ws.send(JSON.stringify([3, callId, { currentTime: new Date().toISOString() }]));
                         break;
 
                     default:
